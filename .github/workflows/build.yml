@@ -21,7 +21,7 @@ jobs:
           password: ${{ secrets.CI_REGISTRY_PASSWORD }}
 
       - name: Docker Build
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           cache-from: ${{ env.CI_REGISTRY_IMAGE }}:latest
           pull: true
