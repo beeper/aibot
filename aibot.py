@@ -13,6 +13,7 @@ class AIBot(Plugin):
     @classmethod
     def get_config_class(cls) -> type[BaseProxyConfig]:
         return Config
+
     async def start(self) -> None:
         self.config.load_and_update()
     
