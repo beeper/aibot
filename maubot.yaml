@@ -3,9 +3,9 @@ id: com.beeper.aimaubot
 version: 0.1.0
 main_class: AIBot
 modules:
-- aibot
+  - aibot
 soft_dependencies:
-- openai
+  - openai
 config: true
 extra_files:
   - base-config.yaml

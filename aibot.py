@@ -5,9 +5,11 @@ from maubot import Plugin, MessageEvent
 from maubot.handlers import command
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 
+
 class Config(BaseProxyConfig):
-  def do_update(self, helper: ConfigUpdateHelper) -> None:
-    helper.copy("API_KEY")
+    def do_update(self, helper: ConfigUpdateHelper) -> None:
+        helper.copy("API_KEY")
+
 
 class AIBot(Plugin):
     @classmethod
@@ -16,7 +18,7 @@ class AIBot(Plugin):
 
     async def start(self) -> None:
         self.config.load_and_update()
-    
+
     MAX_INPUT_LENGTH = 1000
 
     def __init__(self, *args, **kwargs):
@@ -28,8 +30,10 @@ class AIBot(Plugin):
     async def process_message(self, event: MessageEvent, _: str) -> None:
         # Check if the room has only 2 members or 3 members with one bot
         room_members = await self.get_joined_members(event.room_id)
-        if len(room_members) == 2 or any(member.endswith("bot:beeper.local") for member in room_members):
-            input_text = event.content["body"][:self.MAX_INPUT_LENGTH]
+        if len(room_members) == 2 or any(
+            member.endswith("bot:beeper.local") for member in room_members
+        ):
+            input_text = event.content["body"][: self.MAX_INPUT_LENGTH]
             response_text = self.chat_gpt_3_5(input_text, event.room_id)
             await event.reply(response_text)
         else:
@@ -42,14 +46,14 @@ class AIBot(Plugin):
                     self.conversations.pop(event.room_id, None)
                     await event.reply("Conversation history cleared.")
                 else:
-                    input_text = text[:self.MAX_INPUT_LENGTH]
+                    input_text = text[: self.MAX_INPUT_LENGTH]
                     if len(input_text) == self.MAX_INPUT_LENGTH:
-                        await event.reply(f"Input text exceeds maximum length of {self.MAX_INPUT_LENGTH} characters.")
+                        await event.reply(
+                            f"Input text exceeds maximum length of {self.MAX_INPUT_LENGTH} characters."
+                        )
                         return
                     response_text = self.chat_gpt_3_5(input_text, event.room_id)
                     await event.reply(response_text)
-
-
 
     async def get_joined_members(self, room_id):
         room_members = []
@@ -61,12 +65,14 @@ class AIBot(Plugin):
     def is_bot_mentioned(self, event: MessageEvent):
         formatted_body = event.content.get("formatted_body", "")
         print("formatted_body: ", formatted_body)
-        mention_pattern = re.compile(rf"<a href=['\"]https://matrix\.to/#/{self.client.mxid}['\"]>")
+        mention_pattern = re.compile(
+            rf"<a href=['\"]https://matrix\.to/#/{self.client.mxid}['\"]>"
+        )
         match = mention_pattern.search(formatted_body)
         if match:
             start, end = match.start(), match.end()
             text = formatted_body[end:]
-            text = re.sub('<[^<]+?>', '', text)
+            text = re.sub("<[^<]+?>", "", text)
             text = html.unescape(text).strip()
             return start, end, text
         return None
@@ -76,10 +82,17 @@ class AIBot(Plugin):
             if len(text) > self.MAX_INPUT_LENGTH:
                 return f"Input text exceeds maximum length of {self.MAX_INPUT_LENGTH} characters."
 
-            if room_id not in self.conversations: 
-                self.conversations[room_id] = [{"role": "system", "content": "You are ChatGPT, a large language model trained by OpenAI. Carefully heed the user's instructions. Respond using Markdown."}]
+            if room_id not in self.conversations:
+                self.conversations[room_id] = [
+                    {
+                        "role": "system",
+                        "content": "You are ChatGPT, a large language model trained by OpenAI. Carefully heed the user's instructions. Respond using Markdown.",
+                    }
+                ]
 
-            self.conversations[room_id].append({"role": "user", "content": text.strip()})
+            self.conversations[room_id].append(
+                {"role": "user", "content": text.strip()}
+            )
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=self.conversations[room_id],
@@ -89,7 +102,9 @@ class AIBot(Plugin):
                 temperature=0.7,
             )
             assistant_message = response.choices[0].message["content"]
-            self.conversations[room_id].append({"role": "assistant", "content": assistant_message})
+            self.conversations[room_id].append(
+                {"role": "assistant", "content": assistant_message}
+            )
             return assistant_message.strip()
         except Exception as e:
             self.log.error(f"Error in GPT-3.5-turbo API call: {e}")

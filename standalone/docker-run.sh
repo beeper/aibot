@@ -1,17 +1,17 @@
 #!/bin/sh
 
 function fixperms {
-    chown -R $UID:$GID /var/log /data /opt/beeper
+  chown -R $UID:$GID /var/log /data /opt/beeper
 }
 
 cd /opt/beeper/aibot
 
 if [ ! -f /data/config.yaml ]; then
-	cp standalone/example-config.yaml /data/config.yaml
-	echo "Config file not found. Example config copied to /data/config.yaml"
-	echo "Please modify the config file to your liking and restart the container."
-	fixperms
-	exit
+  cp standalone/example-config.yaml /data/config.yaml
+  echo "Config file not found. Example config copied to /data/config.yaml"
+  echo "Please modify the config file to your liking and restart the container."
+  fixperms
+  exit
 fi
 
 fixperms
