@@ -1,0 +1,11 @@
+maubot: 0.1.0
+id: com.beeper.aimaubot
+version: 0.1.0
+main_class: AIBot
+modules:
+- aibot
+soft_dependencies:
+- openai
+config: true
+extra_files:
+  - base-config.yaml
