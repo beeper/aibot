@@ -93,7 +93,7 @@ class AIBot(Plugin):
             and any(member.endswith("bot:beeper.local") for member in room_members)
         ):
             should_reply = True
-        elif not any(member.endswith("bot:beeper.local") for member in room_members):
+        else:
             mention_data = await self.is_bot_mentioned(event)
             if mention_data:
                 should_reply = True
