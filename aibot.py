@@ -59,13 +59,16 @@ class AIBot(Plugin):
             room_members = await self.get_joined_members(evt.room_id)
             num_members = len(room_members)
 
+            # Fetch the bot's display name
+            display_name =  evt.content.displayname
+
             if len(room_members) == 2 or (
                 len(room_members) == 3
                 and any(member.endswith("bot:beeper.local") for member in room_members)
             ):
-                message = f"I am your friendly neighbourhood Beeper AI! <br><br>I am powered by ChatGPT. All messages sent in this chat will be shared with Beeper and OpenAI."
+                message = f"I am your friendly neighbourhood Beeper AI! <br><br>I am powered by Beeper.com and ChatGPT. All messages in this chat will be shared with Beeper and OpenAI."
             else:
-                message = f"I am your friendly neighbourhood Beeper AI! Send me a message starting with <a href='https://matrix.to/#/{self.client.mxid}'>@{self.client.mxid}</a> and I will reply.<br><br>I am powered by ChatGPT. All messages sent in this chat will be shared with Beeper and OpenAI."
+                message = f"I am your friendly neighbourhood Beeper AI! To ask me something, send a message starting with @AI or mention #AI.<br><br>I am powered by Beeper.com and ChatGPT. All messages in this chat will be shared with Beeper and OpenAI."
 
             await self.client.send_message_event(
                 evt.room_id,
@@ -91,7 +94,7 @@ class AIBot(Plugin):
         ):
             should_reply = True
         elif not any(member.endswith("bot:beeper.local") for member in room_members):
-            mention_data = self.is_bot_mentioned(event)
+            mention_data = await self.is_bot_mentioned(event)
             if mention_data:
                 should_reply = True
 
@@ -107,22 +110,36 @@ class AIBot(Plugin):
             room_members.append(user_id)
         return room_members
 
-    def is_bot_mentioned(self, event: MessageEvent):
-        formatted_body = event.content.get("formatted_body", "")
-        if not formatted_body:
+    async def is_bot_mentioned(self, event: MessageEvent):
+        message_text = event.content.get("body", "")
+        print(event)
+        if not message_text:
             return False
-        print("formatted_body: ", formatted_body)
-        mention_pattern = re.compile(
-            rf"<a href=['\"]https://matrix\.to/#/{self.client.mxid}['\"]>"
-        )
-        match = mention_pattern.search(formatted_body)
+
+        mention_pattern = re.compile(r"^(AI|ai|@AI|@ai)|[#]AI|[#]ai")
+        match = mention_pattern.search(message_text)
+
         if match:
             start, end = match.start(), match.end()
-            text = formatted_body[end:]
-            text = re.sub("<[^<]+?>", "", text)
-            text = html.unescape(text).strip()
+            text = message_text[end:].strip()
             return start, end, text
+
+        relates_to = event.content.get("_relates_to", "")
+        if relates_to:
+            in_reply_to = relates_to.get("in_reply_to","")
+            if in_reply_to:
+                in_reply_to_event_id = in_reply_to.get("event_id","")
+                if in_reply_to_event_id:
+                    in_reply_to_event = await self.client.get_event(event.room_id, in_reply_to_event_id)
+
+                    if in_reply_to_event.sender == self.client.mxid:
+                        text = message_text.strip()
+                        return 0, len(text), text
+
         return None
+
+
+
 
     def chat_gpt_3_5(self, text: str, room_id: str) -> str:
         try:
@@ -143,7 +160,7 @@ class AIBot(Plugin):
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=self.conversations[room_id],
-                max_tokens=200,
+                max_tokens=400,
                 n=1,
                 stop=None,
                 temperature=0.7,
