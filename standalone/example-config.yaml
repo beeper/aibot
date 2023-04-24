@@ -45,7 +45,8 @@ database_opts:
   min_size: 1
   max_size: 10
 plugin_config:
-  API_KEY: <insert OpenAI key>
+  OPENAI_API_KEY: <insert OpenAI key>
+  SERPAPI_API_KEY: <insert SerpAPI key>
 
 # Standard Python logging configuration
 logging:

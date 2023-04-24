@@ -1,18 +1,22 @@
 import re
 import html
-import openai
 import asyncio
 from maubot import Plugin, MessageEvent
 from maubot.handlers import command
 from maubot.handlers import event
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 from mautrix.types import EventType, StateEvent, Membership
-
+from langchain.memory import ConversationSummaryBufferMemory
+from langchain.chat_models import ChatOpenAI
+from langchain.agents import initialize_agent
+from langchain.agents import AgentType
+from langchain.agents import load_tools
+import os
 
 class Config(BaseProxyConfig):
     def do_update(self, helper: ConfigUpdateHelper) -> None:
-        helper.copy("API_KEY")
-
+        helper.copy("OPENAI_API_KEY")
+        helper.copy("SERPAPI_API_KEY")
 
 class AIBot(Plugin):
     @classmethod
@@ -26,7 +30,9 @@ class AIBot(Plugin):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        openai.api_key = self.config["API_KEY"]
+
+        os.environ["LANGCHAIN_HANDLER"] = "langchain"
+        os.environ["SERPAPI_API_KEY"] = self.config["SERPAPI_API_KEY"]
         self.conversations = {}
         self.join_message_lock = asyncio.Lock()
 
@@ -100,8 +106,13 @@ class AIBot(Plugin):
 
         if should_reply:
             input_text = event.content["body"][: self.MAX_INPUT_LENGTH]
-            response_text = self.chat_gpt_3_5(input_text, event.room_id)
+            response_text = self.chat(input_text, event.room_id)
             await event.reply(response_text)
+
+    # @command.new(name="hello-world")
+    # async def hello_world(self, evt: MessageEvent) -> None:
+    #     await evt.reply("Hello, World32832898293!")
+
 
     async def get_joined_members(self, room_id):
         room_members = []
@@ -112,10 +123,11 @@ class AIBot(Plugin):
 
     async def is_bot_mentioned(self, event: MessageEvent):
         message_text = event.content.get("body", "")
-        print(event)
+        # print(event)
         if not message_text:
             return False
 
+        # TODO: @griffinai vs @ai, if the bot isn't named "ai"
         mention_pattern = re.compile(r"^(AI|ai|@AI|@ai)|[#]AI|[#]ai")
         match = mention_pattern.search(message_text)
 
@@ -138,38 +150,26 @@ class AIBot(Plugin):
 
         return None
 
-
-
-
-    def chat_gpt_3_5(self, text: str, room_id: str) -> str:
+    def chat(self, text: str, room_id: str) -> str:
         try:
             if len(text) > self.MAX_INPUT_LENGTH:
                 return f"Input text exceeds maximum length of {self.MAX_INPUT_LENGTH} characters."
 
-            if room_id not in self.conversations:
-                self.conversations[room_id] = [
-                    {
-                        "role": "system",
-                        "content": "You are ChatGPT, a large language model trained by OpenAI. Carefully heed the user's instructions. Respond using Markdown.",
-                    }
-                ]
+            llm=ChatOpenAI(temperature=0, model_name="gpt-4", openai_api_key=self.config["OPENAI_API_KEY"])
+            tools = load_tools(["serpapi", "llm-math", "wikipedia"], llm=llm)
 
-            self.conversations[room_id].append(
-                {"role": "user", "content": text.strip()}
-            )
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=self.conversations[room_id],
-                max_tokens=400,
-                n=1,
-                stop=None,
-                temperature=0.7,
-            )
-            assistant_message = response.choices[0].message["content"]
-            self.conversations[room_id].append(
-                {"role": "assistant", "content": assistant_message}
-            )
-            return assistant_message.strip()
+            if room_id not in self.conversations:
+                self.conversations[room_id] = ConversationSummaryBufferMemory(llm=llm, max_token_limit=200, memory_key="chat_history", return_messages=True)
+
+            memory = self.conversations[room_id]
+
+            agent_chain = initialize_agent(tools, llm, agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION, memory=memory)
+            # removed: verbose=True,
+
+            response = agent_chain.run(text.strip())
+
+            return response
+
         except Exception as e:
-            self.log.error(f"Error in GPT-3.5-turbo API call: {e}")
+            self.log.error(f"Error in GPT API call: {e}")
             return "An error occurred while processing your request. Please check the logs for more information."
