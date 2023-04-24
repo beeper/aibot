@@ -155,7 +155,7 @@ class AIBot(Plugin):
             if len(text) > self.MAX_INPUT_LENGTH:
                 return f"Input text exceeds maximum length of {self.MAX_INPUT_LENGTH} characters."
 
-            llm=ChatOpenAI(temperature=0, model_name="gpt-4", openai_api_key=self.config["OPENAI_API_KEY"])
+            llm=ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo", openai_api_key=self.config["OPENAI_API_KEY"])
             tools = load_tools(["serpapi", "llm-math", "wikipedia"], llm=llm)
 
             if room_id not in self.conversations:
