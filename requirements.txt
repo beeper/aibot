@@ -2,3 +2,4 @@ openai
 maubot[all]
 langchain
 google-search-results
+wikipedia
