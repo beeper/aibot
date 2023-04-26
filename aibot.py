@@ -74,7 +74,7 @@ class AIBot(Plugin):
             ):
                 message = f"I am your friendly neighbourhood Beeper AI! <br><br>I am powered by Beeper.com and ChatGPT. All messages in this chat will be shared with Beeper and OpenAI."
             else:
-                message = f"I am your friendly neighbourhood Beeper AI! To ask me something, send a message starting with @AI or mention #AI.<br><br>I am powered by Beeper.com and ChatGPT. All messages in this chat will be shared with Beeper and OpenAI."
+                message = f"I am your friendly neighbourhood Beeper AI! To ask me something, send a message starting with @AI or mention #AI.<br><br> I am powered by Beeper.com and ChatGPT. All messages in this chat will be shared with Beeper and OpenAI."
 
             await self.client.send_message_event(
                 evt.room_id,
