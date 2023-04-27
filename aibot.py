@@ -12,6 +12,7 @@ from langchain.agents import initialize_agent
 from langchain.agents import AgentType
 from langchain.agents import load_tools
 import os
+from maubot.config import Config as maubot_config
 
 class Config(BaseProxyConfig):
     def do_update(self, helper: ConfigUpdateHelper) -> None:
@@ -33,6 +34,14 @@ class AIBot(Plugin):
 
         os.environ["LANGCHAIN_HANDLER"] = "langchain"
         os.environ["SERPAPI_API_KEY"] = self.config["SERPAPI_API_KEY"]
+
+        config = maubot_config("standalone/config.yaml", "standalone/example-config.yaml")
+        config.load()
+
+        self.user_id = config["user.credentials.id"]
+        self.server = config["user.credentials.homeserver"]
+        self.token = config["user.credentials.access_token"]
+
         self.conversations = {}
         self.gpt_versions = {}
         self.join_message_lock = asyncio.Lock()
@@ -90,26 +99,6 @@ class AIBot(Plugin):
                 },
             )
 
-    # @command.new(name="test")
-    # async def test(self, event: MessageEvent) -> None:
-
-    #     server = self.client.homeserver
-    #     user_id = self.client.mxid
-    #     token = self.client.token
-
-    #     response = await self.http.put(f"{server}/_matrix/client/v3/rooms/{event.room_id}/typing/{user_id}", json={
-    #         "typing": True,
-    #         "timeout": 2000
-    #     }, headers={
-    #         "Authorization": f"Bearer {token}"
-    #     })
-    #     data = await response.json()
-    #     print(data)
-
-    #     time.sleep(2)
-    #     await event.reply("12345")
-
-
     @command.passive(regex=r"^[^!].*")
     async def process_message(self, event: MessageEvent, _: str) -> None:
 
@@ -128,7 +117,7 @@ class AIBot(Plugin):
 
         if should_reply:
             input_text = event.content["body"][: self.MAX_INPUT_LENGTH]
-            response_text = self.chat(input_text, event.room_id)
+            response_text = await self.chat(input_text, event.room_id)
             await event.reply(response_text)
 
     @command.new(name="gpt4")
@@ -187,13 +176,24 @@ class AIBot(Plugin):
 
         return None
 
-    def chat(self, text: str, room_id: str) -> str:
+    async def typing(self, status: bool, time: int, room_id: str):
+        await self.http.put(f"{self.server}/_matrix/client/v3/rooms/{room_id}/typing/{self.user_id}", json={
+            "typing": status,
+            "timeout": time
+        }, headers={
+            "Authorization": f"Bearer {self.token}"
+        })
+
+    async def chat(self, text: str, room_id: str) -> str:
         try:
             if len(text) > self.MAX_INPUT_LENGTH:
                 return f"Input text exceeds maximum length of {self.MAX_INPUT_LENGTH} characters."
 
             if room_id not in self.gpt_versions:
                 self.gpt_versions[room_id] = "gpt-3.5-turbo"
+
+            # add typing indicator
+            await self.typing(True, 30000, room_id)
 
             llm=ChatOpenAI(temperature=0, model_name=self.gpt_versions[room_id], openai_api_key=self.config["OPENAI_API_KEY"])
             tools = load_tools(["serpapi", "llm-math", "wikipedia"], llm=llm)
@@ -203,13 +203,20 @@ class AIBot(Plugin):
 
             memory = self.conversations[room_id]
 
-            agent_chain = initialize_agent(tools, llm, agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION, memory=memory)
             # removed: verbose=True,
+            agent_chain = initialize_agent(tools, llm, agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION, memory=memory)
 
             response = agent_chain.run(text.strip())
+
+            # remove typing indicator
+            await self.typing(False, 0, room_id)
 
             return response
 
         except Exception as e:
+
+            # remove typing indicator
+            await self.typing(False, 0, room_id)
+
             self.log.error(f"Error in GPT API call: {e}")
             return "An error occurred while processing your request. Please check the logs for more information."

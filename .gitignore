@@ -2,3 +2,4 @@
 /standalone/config.yaml
 /bot.db-shm
 /bot.db-wal
+/test.py
