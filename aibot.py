@@ -35,7 +35,7 @@ class AIBot(Plugin):
         os.environ["LANGCHAIN_HANDLER"] = "langchain"
         os.environ["SERPAPI_API_KEY"] = self.config["SERPAPI_API_KEY"]
 
-        config = maubot_config("standalone/config.yaml", "standalone/example-config.yaml")
+        config = maubot_config("config.yaml", "standalone/example-config.yaml")
         config.load()
 
         self.user_id = config["user.credentials.id"]

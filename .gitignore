@@ -1,5 +1,5 @@
 /bot.db
-/standalone/config.yaml
+/config.yaml
 /bot.db-shm
 /bot.db-wal
 /test.py
