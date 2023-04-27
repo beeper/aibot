@@ -34,6 +34,7 @@ class AIBot(Plugin):
         os.environ["LANGCHAIN_HANDLER"] = "langchain"
         os.environ["SERPAPI_API_KEY"] = self.config["SERPAPI_API_KEY"]
         self.conversations = {}
+        self.gpt_versions = {}
         self.join_message_lock = asyncio.Lock()
 
     @event.on(EventType.ROOM_MEMBER)
@@ -89,8 +90,29 @@ class AIBot(Plugin):
                 },
             )
 
-    @command.passive(regex=r".*")
+    # @command.new(name="test")
+    # async def test(self, event: MessageEvent) -> None:
+
+    #     server = self.client.homeserver
+    #     user_id = self.client.mxid
+    #     token = self.client.token
+
+    #     response = await self.http.put(f"{server}/_matrix/client/v3/rooms/{event.room_id}/typing/{user_id}", json={
+    #         "typing": True,
+    #         "timeout": 2000
+    #     }, headers={
+    #         "Authorization": f"Bearer {token}"
+    #     })
+    #     data = await response.json()
+    #     print(data)
+
+    #     time.sleep(2)
+    #     await event.reply("12345")
+
+
+    @command.passive(regex=r"^[^!].*")
     async def process_message(self, event: MessageEvent, _: str) -> None:
+
         # Check if the room has only 2 members or 3 members with one bot
         room_members = await self.get_joined_members(event.room_id)
         should_reply = False
@@ -109,10 +131,25 @@ class AIBot(Plugin):
             response_text = self.chat(input_text, event.room_id)
             await event.reply(response_text)
 
-    # @command.new(name="hello-world")
-    # async def hello_world(self, evt: MessageEvent) -> None:
-    #     await evt.reply("Hello, World32832898293!")
+    @command.new(name="gpt4")
+    async def switch_to_gpt4(self, event: MessageEvent) -> None:
 
+        if self.gpt_versions.get(event.room_id) == "gpt-4":
+            await event.reply("This room is already using GPT-4.")
+        else:
+            self.gpt_versions[event.room_id] = "gpt-4"
+            await event.reply("This room has been switched to GPT-4. If you would like to undo this, type !gpt3.5")
+
+    @command.new(name="gpt3.5")
+    async def switch_to_gpt3_5(self, event: MessageEvent) -> None:
+
+        # .get allows it to work even if event.room_id isn't defined (if the user types !gpt3.5 without sending a message beforehand)
+        # the second part of the statement checks whether room_id is defined, since if not it initializes as gpt-3.5-turbo
+        if self.gpt_versions.get(event.room_id) == "gpt-3.5-turbo" or not event.room_id in self.gpt_versions:
+            await event.reply("This room is already using GPT-3.5.")
+        else:
+            self.gpt_versions[event.room_id] = "gpt-3.5-turbo"
+            await event.reply("This room has been switched to GPT-3.5. If you would like to undo this, type !gpt4")
 
     async def get_joined_members(self, room_id):
         room_members = []
@@ -155,7 +192,10 @@ class AIBot(Plugin):
             if len(text) > self.MAX_INPUT_LENGTH:
                 return f"Input text exceeds maximum length of {self.MAX_INPUT_LENGTH} characters."
 
-            llm=ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo", openai_api_key=self.config["OPENAI_API_KEY"])
+            if room_id not in self.gpt_versions:
+                self.gpt_versions[room_id] = "gpt-3.5-turbo"
+
+            llm=ChatOpenAI(temperature=0, model_name=self.gpt_versions[room_id], openai_api_key=self.config["OPENAI_API_KEY"])
             tools = load_tools(["serpapi", "llm-math", "wikipedia"], llm=llm)
 
             if room_id not in self.conversations:
