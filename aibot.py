@@ -193,7 +193,7 @@ class AIBot(Plugin):
                 self.gpt_versions[room_id] = "gpt-3.5-turbo"
 
             # add typing indicator
-            await self.typing(True, 30000, room_id)
+            await self.typing(True, 60000, room_id)
 
             llm=ChatOpenAI(temperature=0, model_name=self.gpt_versions[room_id], openai_api_key=self.config["OPENAI_API_KEY"])
             tools = load_tools(["serpapi", "llm-math", "wikipedia"], llm=llm)
