@@ -1,23 +1,23 @@
-import re
-import html
 import asyncio
-from maubot import Plugin, MessageEvent
-from maubot.handlers import command
-from maubot.handlers import event
-from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
-from mautrix.types import EventType, StateEvent, Membership
-from langchain.memory import ConversationSummaryBufferMemory
-from langchain.chat_models import ChatOpenAI
-from langchain.agents import initialize_agent
-from langchain.agents import AgentType
-from langchain.agents import load_tools
+import html
 import os
+import re
+
+from langchain.agents import AgentType, initialize_agent, load_tools
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationSummaryBufferMemory
+from maubot import MessageEvent, Plugin
 from maubot.config import Config as maubot_config
+from maubot.handlers import command, event
+from mautrix.types import EventType, Membership, StateEvent
+from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
+
 
 class Config(BaseProxyConfig):
     def do_update(self, helper: ConfigUpdateHelper) -> None:
         helper.copy("OPENAI_API_KEY")
         helper.copy("SERPAPI_API_KEY")
+
 
 class AIBot(Plugin):
     @classmethod
@@ -76,7 +76,7 @@ class AIBot(Plugin):
             num_members = len(room_members)
 
             # Fetch the bot's display name
-            display_name =  evt.content.displayname
+            display_name = evt.content.displayname
 
             if len(room_members) == 2 or (
                 len(room_members) == 3
@@ -101,7 +101,6 @@ class AIBot(Plugin):
 
     @command.passive(regex=r"^[^!].*")
     async def process_message(self, event: MessageEvent, _: str) -> None:
-
         # Check if the room has only 2 members or 3 members with one bot
         room_members = await self.get_joined_members(event.room_id)
         should_reply = False
@@ -122,23 +121,28 @@ class AIBot(Plugin):
 
     @command.new(name="gpt4")
     async def switch_to_gpt4(self, event: MessageEvent) -> None:
-
         if self.gpt_versions.get(event.room_id) == "gpt-4":
             await event.reply("This room is already using GPT-4.")
         else:
             self.gpt_versions[event.room_id] = "gpt-4"
-            await event.reply("This room has been switched to GPT-4. If you would like to undo this, type !gpt3.5")
+            await event.reply(
+                "This room has been switched to GPT-4. If you would like to undo this, type !gpt3.5"
+            )
 
     @command.new(name="gpt3.5")
     async def switch_to_gpt3_5(self, event: MessageEvent) -> None:
-
         # .get allows it to work even if event.room_id isn't defined (if the user types !gpt3.5 without sending a message beforehand)
         # the second part of the statement checks whether room_id is defined, since if not it initializes as gpt-3.5-turbo
-        if self.gpt_versions.get(event.room_id) == "gpt-3.5-turbo" or not event.room_id in self.gpt_versions:
+        if (
+            self.gpt_versions.get(event.room_id) == "gpt-3.5-turbo"
+            or not event.room_id in self.gpt_versions
+        ):
             await event.reply("This room is already using GPT-3.5.")
         else:
             self.gpt_versions[event.room_id] = "gpt-3.5-turbo"
-            await event.reply("This room has been switched to GPT-3.5. If you would like to undo this, type !gpt4")
+            await event.reply(
+                "This room has been switched to GPT-3.5. If you would like to undo this, type !gpt4"
+            )
 
     async def get_joined_members(self, room_id):
         room_members = []
@@ -164,11 +168,13 @@ class AIBot(Plugin):
 
         relates_to = event.content.get("_relates_to", "")
         if relates_to:
-            in_reply_to = relates_to.get("in_reply_to","")
+            in_reply_to = relates_to.get("in_reply_to", "")
             if in_reply_to:
-                in_reply_to_event_id = in_reply_to.get("event_id","")
+                in_reply_to_event_id = in_reply_to.get("event_id", "")
                 if in_reply_to_event_id:
-                    in_reply_to_event = await self.client.get_event(event.room_id, in_reply_to_event_id)
+                    in_reply_to_event = await self.client.get_event(
+                        event.room_id, in_reply_to_event_id
+                    )
 
                     if in_reply_to_event.sender == self.client.mxid:
                         text = message_text.strip()
@@ -177,12 +183,11 @@ class AIBot(Plugin):
         return None
 
     async def typing(self, status: bool, time: int, room_id: str):
-        await self.http.put(f"{self.server}/_matrix/client/v3/rooms/{room_id}/typing/{self.user_id}", json={
-            "typing": status,
-            "timeout": time
-        }, headers={
-            "Authorization": f"Bearer {self.token}"
-        })
+        await self.http.put(
+            f"{self.server}/_matrix/client/v3/rooms/{room_id}/typing/{self.user_id}",
+            json={"typing": status, "timeout": time},
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
 
     async def chat(self, text: str, room_id: str) -> str:
         try:
@@ -195,16 +200,30 @@ class AIBot(Plugin):
             # add typing indicator
             await self.typing(True, 60000, room_id)
 
-            llm=ChatOpenAI(temperature=0, model_name=self.gpt_versions[room_id], openai_api_key=self.config["OPENAI_API_KEY"])
+            llm = ChatOpenAI(
+                temperature=0,
+                model_name=self.gpt_versions[room_id],
+                openai_api_key=self.config["OPENAI_API_KEY"],
+            )
             tools = load_tools(["serpapi", "llm-math", "wikipedia"], llm=llm)
 
             if room_id not in self.conversations:
-                self.conversations[room_id] = ConversationSummaryBufferMemory(llm=llm, max_token_limit=200, memory_key="chat_history", return_messages=True)
+                self.conversations[room_id] = ConversationSummaryBufferMemory(
+                    llm=llm,
+                    max_token_limit=200,
+                    memory_key="chat_history",
+                    return_messages=True,
+                )
 
             memory = self.conversations[room_id]
 
             # removed: verbose=True,
-            agent_chain = initialize_agent(tools, llm, agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION, memory=memory)
+            agent_chain = initialize_agent(
+                tools,
+                llm,
+                agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
+                memory=memory,
+            )
 
             response = agent_chain.run(text.strip())
 
@@ -214,7 +233,6 @@ class AIBot(Plugin):
             return response
 
         except Exception as e:
-
             # remove typing indicator
             await self.typing(False, 0, room_id)
 
