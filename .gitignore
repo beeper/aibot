@@ -3,3 +3,6 @@
 /bot.db-shm
 /bot.db-wal
 /test.py
+/.idea/
+/.DS_Store
+/__pycache__
