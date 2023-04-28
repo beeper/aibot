@@ -8,4 +8,4 @@ cd /opt/beeper/aibot
 
 fixperms
 exec su-exec $UID:$GID python3 -m maubot.standalone -m maubot.yaml \
-  -c standalone/config.yaml -b standalone/example-config.yaml
+  -c /data/config.yaml -b standalone/example-config.yaml
