@@ -6,6 +6,10 @@ modules:
   - aibot
 soft_dependencies:
   - openai
+  - langchain
+  - google-search-results
+  - wikipedia
+  - tiktoken
 config: true
 extra_files:
   - base-config.yaml
