@@ -3,4 +3,4 @@ langchain[llms]
 google-search-results
 wikipedia
 tiktoken
-SQLAlchemy
+SQLAlchemy==1.4.47
