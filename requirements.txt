@@ -1,5 +1,5 @@
 openai
-langchain[llms]
+langchain[all]
 google-search-results
 wikipedia
 tiktoken
