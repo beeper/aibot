@@ -1,7 +1,6 @@
 openai
-maubot[all]
 langchain
 google-search-results
 wikipedia
 tiktoken
-SQLAlchemy==1.4.47
+SQLAlchemy
